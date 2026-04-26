@@ -9,54 +9,61 @@ interface RiskBadgeProps {
   size?: "sm" | "lg";
 }
 
-type Tier = "critical" | "urgent" | "routine";
+type Tier = "critical" | "urgent" | "routine" | "unknown";
 
+// Uses semantic CSS tokens from globals.css — no raw hex
 const tierConfig: Record<Tier, {
   bg: string;
   border: string;
   color: string;
   dot: string;
   glow: string;
+  label: string;
 }> = {
   critical: {
-    bg: "rgba(153, 27, 27, 0.18)",
-    border: "rgba(239, 68, 68, 0.35)",
-    color: "#f87171",
-    dot: "#ef4444",
-    glow: "0 0 14px rgba(239,68,68,0.3)",
+    bg: "var(--color-critical-bg)",
+    border: "var(--color-critical-border)",
+    color: "var(--color-critical-text)",
+    dot: "var(--color-critical)",
+    glow: "0 0 8px rgba(239,68,68,0.2)",
+    label: "Critical",
   },
   urgent: {
-    bg: "rgba(120, 53, 15, 0.2)",
-    border: "rgba(245, 158, 11, 0.35)",
-    color: "#fbbf24",
-    dot: "#f59e0b",
-    glow: "0 0 14px rgba(245,158,11,0.25)",
+    bg: "var(--color-urgent-bg)",
+    border: "var(--color-urgent-border)",
+    color: "var(--color-urgent-text)",
+    dot: "var(--color-urgent)",
+    glow: "0 0 8px rgba(245,158,11,0.2)",
+    label: "Urgent",
   },
   routine: {
-    bg: "rgba(20, 83, 45, 0.18)",
-    border: "rgba(34, 197, 94, 0.3)",
-    color: "#4ade80",
-    dot: "#22c55e",
-    glow: "0 0 12px rgba(34,197,94,0.2)",
+    bg: "var(--color-routine-bg)",
+    border: "var(--color-routine-border)",
+    color: "var(--color-routine-text)",
+    dot: "var(--color-routine)",
+    glow: "0 0 8px rgba(34,197,94,0.15)",
+    label: "Routine",
   },
-};
-
-const fallbackConfig = {
-  bg: "rgba(30, 41, 59, 0.5)",
-  border: "rgba(51, 65, 85, 0.6)",
-  color: "rgba(148, 163, 184, 0.7)",
-  dot: "#475569",
-  glow: "none",
+  unknown: {
+    bg: "var(--bg-elevated)",
+    border: "var(--border-default)",
+    color: "var(--text-secondary)",
+    dot: "var(--text-tertiary)",
+    glow: "none",
+    label: "Unknown",
+  },
 };
 
 export function RiskBadge({ tier, score, news2Score, size = "sm" }: RiskBadgeProps) {
-  const config = tierConfig[tier as Tier] ?? fallbackConfig;
+  const normalizedTier = (tier as Tier) in tierConfig ? (tier as Tier) : "unknown";
+  const config = tierConfig[normalizedTier];
   const isPending = score === 0;
+  const dotSize = size === "lg" ? "9px" : "7px";
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full font-semibold",
+        "inline-flex items-center gap-1.5 rounded-full font-semibold tabular-nums",
         size === "lg" ? "px-4 py-2 text-sm gap-2" : "px-2.5 py-1 text-xs"
       )}
       style={{
@@ -66,22 +73,34 @@ export function RiskBadge({ tier, score, news2Score, size = "sm" }: RiskBadgePro
         boxShadow: config.glow,
         fontFamily: "var(--font-inter)",
       }}
+      // Accessible text for screen readers (SKILL.md: voiceover-sr)
+      aria-label={
+        isPending
+          ? `${config.label} — pending analysis`
+          : `${config.label} — risk score ${score} out of 10, NEWS2 score ${news2Score}`
+      }
     >
-      {/* Animated dot */}
+      {/* Animated dot — aria-hidden since aria-label covers the meaning */}
       <span
         className="pulse-dot"
-        style={{ background: config.dot, width: size === "lg" ? "9px" : "7px", height: size === "lg" ? "9px" : "7px" }}
+        style={{ background: config.dot, width: dotSize, height: dotSize }}
+        aria-hidden="true"
       />
 
       {/* Tier label */}
-      <span className="capitalize">{tier}</span>
+      <span aria-hidden="true">{config.label}</span>
 
-      {!isPending && (
+      {isPending ? (
         <>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span>{score}/10</span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span>NEWS2: {news2Score}</span>
+          <span style={{ opacity: 0.4 }} aria-hidden="true">·</span>
+          <span aria-hidden="true">Pending</span>
+        </>
+      ) : (
+        <>
+          <span style={{ opacity: 0.4 }} aria-hidden="true">·</span>
+          <span aria-hidden="true">{score}/10</span>
+          <span style={{ opacity: 0.4 }} aria-hidden="true">·</span>
+          <span aria-hidden="true">NEWS2: {news2Score}</span>
         </>
       )}
     </span>

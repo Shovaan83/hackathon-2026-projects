@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Inter, Outfit, Public_Sans } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -14,10 +14,22 @@ const outfit = Outfit({
   variable: "--font-outfit",
 });
 
+const publicSans = Public_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-public-sans",
+});
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0d4d8a",
+};
+
 export const metadata: Metadata = {
-  title: "VitalsFlow — AI-Powered Clinical Triage",
+  title: "VitalsFlow — AI Clinical Triage System",
   description:
-    "AI-powered predictive triage using HL7 FHIR R4 and the clinically validated NEWS2 protocol. Powered by Gemini 1.5 Flash.",
+    "AI-assisted clinical decision support using HL7 FHIR, NEWS2 scoring, and Gemini AI. Real-time patient triage, risk stratification, and clinician action center.",
   keywords: [
     "clinical triage",
     "NEWS2",
@@ -25,6 +37,8 @@ export const metadata: Metadata = {
     "AI healthcare",
     "patient safety",
     "Gemini",
+    "VitalsFlow",
+    "clinical decision support",
   ],
 };
 
@@ -32,10 +46,14 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`h-full ${inter.variable} ${outfit.variable}`}>
-      <body className="h-full bg-slate-950 antialiased overflow-hidden">
+    <html lang="en" className={`h-full ${inter.variable} ${outfit.variable} ${publicSans.variable}`}>
+      <body className="h-full antialiased" suppressHydrationWarning>
         {/* Animated mesh background */}
         <div className="bg-mesh" aria-hidden="true" />
+        {/* Skip to main content for keyboard users (SKILL.md: skip-links CRITICAL) */}
+        <a href="#main-content" className="skip-to-content">
+          Skip to main content
+        </a>
         {children}
       </body>
     </html>

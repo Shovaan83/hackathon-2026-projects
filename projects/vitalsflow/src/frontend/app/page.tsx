@@ -1,528 +1,530 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import Link from "next/link";
 import {
-  Stethoscope,
-  Search,
-  AlertCircle,
-  Wifi,
-  WifiOff,
-  X,
-  ChevronRight,
-  Loader2,
-  Sparkles,
+  AlertTriangle,
+  ArrowRight,
+  ClipboardCheck,
+  ShieldAlert,
+  Activity,
+  Users,
+  TrendingUp,
+  Brain,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
+import { ClinicalShell } from "@/components/ClinicalShell";
 
-import { RiskBadge } from "@/components/RiskBadge";
-import { ActionCenter } from "@/components/ActionCenter";
-import { VitalsTrend } from "@/components/VitalsTrend";
-import { PatientCard } from "@/components/PatientCard";
-import { VitalsForm } from "@/components/VitalsForm";
-import { TriageScoreCard } from "@/components/TriageScoreCard";
+const queueRows = [
+  {
+    id: "882910",
+    patient: "Reynolds, M.",
+    mrn: "MR-8942-A",
+    score: 9,
+    signal: "Likely Sepsis",
+    location: "Bed 12 (ER)",
+    updated: "Just now",
+    riskClass: "critical",
+  },
+  {
+    id: "771029",
+    patient: "Chen, L.",
+    mrn: "MR-7731-B",
+    score: 7,
+    signal: "Respiratory Deterioration",
+    location: "Bed 04 (ER)",
+    updated: "4m ago",
+    riskClass: "urgent",
+  },
+  {
+    id: "901212",
+    patient: "O'Connor, S.",
+    mrn: "MR-9012-C",
+    score: 4,
+    signal: "Stable Monitoring",
+    location: "Wait Rm A",
+    updated: "12m ago",
+    riskClass: "routine",
+  },
+];
 
-import {
-  searchPatients,
-  runTriage,
-  healthCheck,
-  DEFAULT_VITALS,
-  type Patient,
-  type VitalsPayload,
-  type TriageResult,
-} from "@/lib/api";
-import { cn } from "@/lib/utils";
+const riskMeta: Record<
+  string,
+  { bg: string; border: string; color: string; dot: string; label: string }
+> = {
+  critical: {
+    bg: "rgba(239,68,68,0.10)",
+    border: "rgba(239,68,68,0.30)",
+    color: "#ef4444",
+    dot: "#ef4444",
+    label: "CRITICAL",
+  },
+  urgent: {
+    bg: "rgba(245,158,11,0.10)",
+    border: "rgba(245,158,11,0.30)",
+    color: "#f59e0b",
+    dot: "#f59e0b",
+    label: "URGENT",
+  },
+  routine: {
+    bg: "rgba(34,197,94,0.10)",
+    border: "rgba(34,197,94,0.25)",
+    color: "#22c55e",
+    dot: "#22c55e",
+    label: "ROUTINE",
+  },
+};
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Skeleton
-// ─────────────────────────────────────────────────────────────────────────────
-function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("skeleton", className)} />;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dashboard
-// ─────────────────────────────────────────────────────────────────────────────
-export default function Dashboard() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [vitals, setVitals] = useState<VitalsPayload>(DEFAULT_VITALS);
-  const [triageResults, setTriageResults] = useState<Record<string, TriageResult>>({});
-  const [isSearching, setIsSearching] = useState(false);
-  const [isTriaging, setIsTriaging] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Health check ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    healthCheck().then(setBackendOnline);
-    const interval = setInterval(() => {
-      healthCheck().then(setBackendOnline);
-    }, 600_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleSearch = useCallback(async () => {
-    if (!searchQuery.trim()) return;
-    setIsSearching(true);
-    setError(null);
-    setHasSearched(true);
-    try {
-      const results = await searchPatients(searchQuery.trim());
-      setPatients(results);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Search failed");
-    } finally {
-      setIsSearching(false);
-    }
-  }, [searchQuery]);
-
-  const handlePatientSelect = useCallback((patient: Patient) => {
-    setSelectedPatient(patient);
-    setError(null);
-  }, []);
-
-  const handleTriageSubmit = useCallback(async () => {
-    if (!selectedPatient) return;
-    setIsTriaging(true);
-    setError(null);
-    try {
-      const result = await runTriage(selectedPatient.id, vitals);
-      setTriageResults((prev) => ({ ...prev, [selectedPatient.id]: result }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Triage failed");
-    } finally {
-      setIsTriaging(false);
-    }
-  }, [selectedPatient, vitals]);
-
-  const currentTriageResult = selectedPatient
-    ? triageResults[selectedPatient.id] ?? null
-    : null;
-
-  // ─────────────────────────────────────────────────────────────────────────
+// ── Stat card ────────────────────────────────────────────────────────────────
+function StatCard({
+  label,
+  value,
+  sub,
+  subColor,
+  accentColor,
+  icon,
+  iconBg,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  subColor?: string;
+  accentColor: string;
+  icon: React.ReactNode;
+  iconBg: string;
+}) {
   return (
     <div
-      className="relative flex h-screen flex-col overflow-hidden"
-      style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}
+      className="glass-card flex flex-col gap-4 p-5"
+      style={{ borderLeft: `3px solid ${accentColor}` }}
     >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header
-        className="relative z-20 flex items-center justify-between px-6 py-3"
-        style={{
-          background: "rgba(2, 8, 23, 0.85)",
-          borderBottom: "1px solid var(--border-subtle)",
-          backdropFilter: "blur(20px)",
-        }}
-      >
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl"
-            style={{
-              background: "linear-gradient(135deg, #1d4ed8, #0ea5e9)",
-              boxShadow: "0 0 20px rgba(59,130,246,0.35)",
-            }}
-          >
-            <Stethoscope className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h1
-              className="text-lg font-bold leading-tight tracking-tight"
-              style={{
-                fontFamily: "var(--font-outfit)",
-                background: "linear-gradient(135deg, #f1f5f9, #94a3b8)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              VitalsFlow
-            </h1>
-            <p className="text-[10px] tracking-widest uppercase"
-               style={{ color: "var(--text-tertiary)" }}>
-              AI Triage · NEWS2 Protocol
-            </p>
-          </div>
-        </div>
-
-        {/* Status + badge */}
-        <div className="flex items-center gap-3">
-          <div
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
-            style={{
-              background:
-                backendOnline === null
-                  ? "rgba(51, 65, 85, 0.4)"
-                  : backendOnline
-                  ? "rgba(34, 197, 94, 0.1)"
-                  : "rgba(239, 68, 68, 0.1)",
-              border: `1px solid ${
-                backendOnline === null
-                  ? "rgba(51,65,85,0.6)"
-                  : backendOnline
-                  ? "rgba(34,197,94,0.3)"
-                  : "rgba(239,68,68,0.3)"
-              }`,
-              color:
-                backendOnline === null
-                  ? "var(--text-tertiary)"
-                  : backendOnline
-                  ? "#4ade80"
-                  : "#f87171",
-            }}
-          >
-            {backendOnline === null ? (
-              <>
-                <span
-                  className="pulse-dot"
-                  style={{ background: "var(--text-tertiary)" }}
-                />
-                Connecting…
-              </>
-            ) : backendOnline ? (
-              <>
-                <Wifi className="h-3.5 w-3.5" />
-                FHIR Connected
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3.5 w-3.5" />
-                Backend offline
-              </>
-            )}
-          </div>
-
-          <div
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-medium"
-            style={{
-              background: "rgba(139, 92, 246, 0.1)",
-              border: "1px solid rgba(139, 92, 246, 0.25)",
-              color: "#c4b5fd",
-            }}
-          >
-            <Sparkles className="h-3 w-3" />
-            Gemini 1.5 Flash
-          </div>
-        </div>
-      </header>
-
-      {/* ── Error banner ────────────────────────────────────────────────────── */}
-      {error && (
+      <div className="flex items-start justify-between">
+        <p
+          className="text-[10px] font-semibold uppercase tracking-widest leading-tight"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {label}
+        </p>
         <div
-          className="relative z-20 flex items-center gap-3 px-6 py-3 text-sm animate-fade-in"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+          style={{ background: iconBg }}
+        >
+          {icon}
+        </div>
+      </div>
+      <div>
+        <p
+          className="text-4xl font-bold leading-none"
+          style={{ color: accentColor, fontFamily: "var(--font-outfit)" }}
+        >
+          {value}
+        </p>
+        <p
+          className="mt-2 text-xs leading-snug"
+          style={{ color: subColor ?? "var(--text-tertiary)" }}
+        >
+          {sub}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
+export default function DashboardPage() {
+  return (
+    <ClinicalShell
+      title="Clinician Dashboard"
+      subtitle="Live triage queue and action center for bedside decision support"
+      actions={
+        <Link
+          href="/approvals"
+          className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all hover:brightness-110"
           style={{
-            background: "rgba(153, 27, 27, 0.3)",
-            borderBottom: "1px solid rgba(239,68,68,0.2)",
-            color: "#fca5a5",
+            background: "var(--accent-blue-dim)",
+            border: "1px solid var(--accent-blue)",
+            color: "var(--accent-blue)",
+            minHeight: "36px",
           }}
         >
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span className="flex-1">{error}</span>
-          <button
-            onClick={() => setError(null)}
-            className="rounded-md p-1 transition-colors hover:bg-red-900/40"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+          <ClipboardCheck className="h-3.5 w-3.5" />
+          4 Pending Approvals
+        </Link>
+      }
+    >
+      {/* ── Stat Cards ──────────────────────────────────────────────────── */}
+      <section
+        className="grid grid-cols-2 gap-4 xl:grid-cols-4"
+        aria-label="Key metrics"
+      >
+        <StatCard
+          label="Total Active"
+          value="42"
+          sub="3 fewer than previous shift"
+          accentColor="var(--accent-blue)"
+          iconBg="var(--accent-blue-dim)"
+          icon={<Users className="h-4 w-4" style={{ color: "var(--accent-blue)" }} />}
+        />
+        <StatCard
+          label="High Risk (NEWS2 > 7)"
+          value="8"
+          sub="Trending up +2 in last hour"
+          subColor="rgba(239,68,68,0.8)"
+          accentColor="#ef4444"
+          iconBg="rgba(239,68,68,0.10)"
+          icon={<TrendingUp className="h-4 w-4" style={{ color: "#ef4444" }} />}
+        />
+        <StatCard
+          label="Critical Alerts"
+          value="3"
+          sub="2 sepsis · 1 cardiac escalation"
+          subColor="rgba(245,158,11,0.8)"
+          accentColor="#f59e0b"
+          iconBg="rgba(245,158,11,0.10)"
+          icon={<AlertTriangle className="h-4 w-4" style={{ color: "#f59e0b" }} />}
+        />
+        <StatCard
+          label="AI Suggestion Approval"
+          value="94%"
+          sub="Consistent with previous 24h"
+          subColor="rgba(34,197,94,0.8)"
+          accentColor="#22c55e"
+          iconBg="rgba(34,197,94,0.10)"
+          icon={<CheckCircle2 className="h-4 w-4" style={{ color: "#22c55e" }} />}
+        />
+      </section>
 
-      {/* ── Main layout ─────────────────────────────────────────────────────── */}
-      <div className="relative z-10 flex flex-1 overflow-hidden">
+      {/* ── Main Grid ───────────────────────────────────────────────────── */}
+      <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-4">
 
-        {/* ── Left sidebar ─────────────────────────────────────────────────── */}
-        <aside
-          className="flex w-72 flex-shrink-0 flex-col"
-          style={{ borderRight: "1px solid var(--border-subtle)" }}
-        >
-          {/* Search box */}
+        {/* ── Triage Queue (3 cols) ──────────────────────────────────────── */}
+        <div className="glass-card flex flex-col lg:col-span-3" style={{ minHeight: "420px" }}>
+          {/* Header */}
           <div
-            className="p-4"
+            className="flex items-center justify-between px-6 py-4"
             style={{ borderBottom: "1px solid var(--border-subtle)" }}
           >
-            <p
-              className="mb-3 text-[10px] font-semibold uppercase tracking-widest"
-              style={{ color: "var(--text-tertiary)" }}
-            >
-              Patient Search
-            </p>
-            <div className="flex gap-2">
-              <input
-                ref={searchInputRef}
-                type="text"
-                id="patient-search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                placeholder="Search by name…"
-                className="input-field flex-1"
-                style={{ paddingRight: "0.75rem" }}
-              />
-              <button
-                id="search-btn"
-                onClick={handleSearch}
-                disabled={isSearching}
-                className="btn-primary flex-shrink-0 px-3"
-                aria-label="Search patients"
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-full"
+                style={{ background: "var(--accent-blue-dim)" }}
               >
-                {isSearching ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-              </button>
+                <Activity className="h-4 w-4" style={{ color: "var(--accent-blue)" }} />
+              </div>
+              <div>
+                <h2
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--text-primary)", fontFamily: "var(--font-outfit)" }}
+                >
+                  Active Triage Queue
+                </h2>
+                <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                  Prioritized by NEWS2 severity and latest AI signal
+                </p>
+              </div>
             </div>
-            <p
-              className="mt-2 text-[10px]"
-              style={{ color: "var(--text-muted)" }}
+            <span
+              className="rounded-full px-3 py-1.5 text-[10px] font-semibold"
+              style={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+              }}
             >
-              Try &ldquo;Smith&rdquo; or &ldquo;Johnson&rdquo; — HAPI FHIR R4 data
-            </p>
+              42 patients live
+            </span>
           </div>
 
-          {/* Patient list */}
-          <div className="flex-1 overflow-y-auto">
-            {isSearching ? (
-              <div className="flex flex-col gap-0">
-                {[0, 1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="p-4"
-                    style={{
-                      borderBottom: "1px solid var(--border-subtle)",
-                      animationDelay: `${i * 0.08}s`,
-                    }}
-                  >
-                    <Skeleton className="mb-2 h-3.5 w-3/4" />
-                    <Skeleton className="h-2.5 w-1/2" />
-                  </div>
-                ))}
-              </div>
-            ) : patients.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-                <div
-                  className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
-                  style={{
-                    background: "rgba(30, 41, 59, 0.6)",
-                    border: "1px solid var(--border-subtle)",
-                  }}
-                >
-                  <Stethoscope
-                    className="h-7 w-7"
-                    style={{ color: "var(--text-muted)" }}
-                  />
-                </div>
-                <p
-                  className="text-sm font-medium"
-                  style={{ color: "var(--text-tertiary)" }}
-                >
-                  {hasSearched ? "No patients found" : "Search for a patient"}
-                </p>
-                {!hasSearched && (
-                  <p
-                    className="mt-1 text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Enter a name above to begin
-                  </p>
-                )}
-              </div>
-            ) : (
-              <>
-                <p
-                  className="px-4 pt-3 pb-2 text-[10px] font-medium"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  {patients.length} patient{patients.length !== 1 ? "s" : ""} found
-                </p>
-                {patients.map((p, idx) => (
-                  <div
-                    key={p.id}
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: `${idx * 0.05}s` }}
-                  >
-                    <PatientCard
-                      patient={p}
-                      isSelected={selectedPatient?.id === p.id}
-                      onClick={() => handlePatientSelect(p)}
-                      triageResult={triageResults[p.id] ?? null}
-                    />
-                  </div>
-                ))}
-              </>
-            )}
+          {/* Table */}
+          <div className="flex-1 overflow-x-auto">
+            <table
+              className="w-full text-left"
+              style={{ minWidth: "540px" }}
+              role="grid"
+              aria-label="Active triage queue"
+            >
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                  {["Patient", "NEWS2", "Signal", "Location", "Updated"].map((h) => (
+                    <th
+                      key={h}
+                      scope="col"
+                      className="px-6 py-3 text-[9px] font-semibold uppercase tracking-widest"
+                      style={{
+                        color: "var(--text-muted)",
+                        background: "var(--bg-elevated)",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {queueRows.map((row, i) => {
+                  const meta = riskMeta[row.riskClass];
+                  return (
+                    <tr
+                      key={row.id}
+                      className="table-row-hover"
+                      style={{
+                        borderBottom:
+                          i < queueRows.length - 1
+                            ? "1px solid var(--border-subtle)"
+                            : "none",
+                      }}
+                    >
+                      {/* Patient */}
+                      <td className="px-6 py-5">
+                        <Link
+                          href={`/patient/${row.id}`}
+                          className="block"
+                          aria-label={`${row.patient}, ${meta.label}`}
+                        >
+                          <p
+                            className="text-sm font-semibold"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {row.patient}
+                          </p>
+                          <p
+                            className="mt-0.5 font-mono text-[10px]"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {row.mrn}
+                          </p>
+                        </Link>
+                      </td>
+
+                      {/* NEWS2 badge */}
+                      <td className="px-6 py-5">
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold tabular-nums"
+                          style={{
+                            background: meta.bg,
+                            border: `1px solid ${meta.border}`,
+                            color: meta.color,
+                          }}
+                        >
+                          <span
+                            className="pulse-dot"
+                            style={{
+                              background: meta.dot,
+                              width: "6px",
+                              height: "6px",
+                            }}
+                            aria-hidden="true"
+                          />
+                          {row.score}
+                        </span>
+                      </td>
+
+                      {/* Signal */}
+                      <td
+                        className="px-6 py-5 text-sm"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {row.signal}
+                      </td>
+
+                      {/* Location */}
+                      <td
+                        className="px-6 py-5 text-sm"
+                        style={{ color: "var(--text-tertiary)" }}
+                      >
+                        {row.location}
+                      </td>
+
+                      {/* Updated */}
+                      <td className="px-6 py-5">
+                        <span
+                          className="inline-flex items-center gap-1.5 text-xs"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                          <time>{row.updated}</time>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
           {/* Footer */}
           <div
-            className="px-4 py-3"
+            className="flex items-center justify-between px-6 py-4"
             style={{ borderTop: "1px solid var(--border-subtle)" }}
           >
-            <p
-              className="text-[10px]"
-              style={{ color: "var(--text-muted)" }}
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Showing 3 of 42 active patients
+            </p>
+            <Link
+              href="/patient/882910"
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all hover:-translate-y-0.5"
+              style={{
+                background: "var(--accent-blue-dim)",
+                border: "1px solid var(--accent-blue)",
+                color: "var(--accent-blue)",
+                minHeight: "36px",
+              }}
             >
-              Synthetic data only · No real patient data stored
+              Open Patient Detail
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* ── Right Panel (1 col) ────────────────────────────────────────── */}
+        <div className="flex flex-col gap-5">
+
+          {/* Action Required */}
+          <div
+            className="glass-card p-5"
+            style={{ borderLeft: "3px solid #ef4444" }}
+          >
+            <div
+              className="mb-4 flex items-center gap-2 pb-3"
+              style={{ borderBottom: "1px solid rgba(239,68,68,0.15)" }}
+            >
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-full"
+                style={{ background: "rgba(239,68,68,0.12)" }}
+              >
+                <ShieldAlert className="h-3.5 w-3.5" style={{ color: "#ef4444" }} />
+              </div>
+              <h3
+                className="text-[10px] font-semibold uppercase tracking-widest"
+                style={{ color: "#ef4444" }}
+              >
+                Action Required
+              </h3>
+            </div>
+            <p
+              className="text-xs leading-relaxed"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <span
+                className="font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Reynolds, M. (Bed 12)
+              </span>{" "}
+              shows likely signs of sepsis. Lactate and ABG orders are waiting for sign-off.
+            </p>
+            <Link
+              href="/approvals"
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold transition-opacity hover:opacity-80"
+              style={{ color: "#ef4444" }}
+            >
+              Review approvals
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          {/* Ward NEWS2 Distribution */}
+          <div
+            className="glass-card p-5"
+            style={{ borderLeft: "3px solid var(--accent-blue)" }}
+          >
+            <div
+              className="mb-4 flex items-center gap-2 pb-3"
+              style={{ borderBottom: "1px solid var(--border-subtle)" }}
+            >
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-full"
+                style={{ background: "var(--accent-blue-dim)" }}
+              >
+                <Brain className="h-3.5 w-3.5" style={{ color: "var(--accent-blue)" }} />
+              </div>
+              <h3
+                className="text-[10px] font-semibold uppercase tracking-widest"
+                style={{ color: "var(--accent-blue)" }}
+              >
+                Ward NEWS2 Distribution
+              </h3>
+            </div>
+
+            <ul className="space-y-3">
+              {[
+                { label: "Low (0–4)", count: 24, pct: 57, color: "#22c55e" },
+                { label: "Medium (5–6)", count: 10, pct: 24, color: "#f59e0b" },
+                { label: "High (7+)", count: 8, pct: 19, color: "#ef4444" },
+              ].map(({ label, count, pct, color }) => (
+                <li key={label}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span
+                      className="text-xs"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {label}
+                    </span>
+                    <span
+                      className="text-sm font-bold tabular-nums"
+                      style={{ color }}
+                    >
+                      {count}
+                    </span>
+                  </div>
+                  <div
+                    className="h-1.5 w-full overflow-hidden rounded-full"
+                    style={{ background: "var(--bg-elevated)" }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${pct}%`, background: color }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <Link
+              href="/system-health"
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold transition-opacity hover:opacity-80"
+              style={{ color: "var(--accent-blue)" }}
+            >
+              Check system telemetry
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          {/* Escalation Summary */}
+          <div
+            className="glass-card p-5"
+            style={{ borderLeft: "3px solid #f59e0b" }}
+          >
+            <div
+              className="mb-4 flex items-center gap-2 pb-3"
+              style={{ borderBottom: "1px solid rgba(245,158,11,0.15)" }}
+            >
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-full"
+                style={{ background: "rgba(245,158,11,0.10)" }}
+              >
+                <AlertTriangle className="h-3.5 w-3.5" style={{ color: "#f59e0b" }} />
+              </div>
+              <h3
+                className="text-[10px] font-semibold uppercase tracking-widest"
+                style={{ color: "#f59e0b" }}
+              >
+                Escalation Summary
+              </h3>
+            </div>
+            <p
+              className="text-xs leading-relaxed"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Oldest pending approval is{" "}
+              <span style={{ color: "#f59e0b", fontWeight: 600 }}>
+                14 minutes
+              </span>
+              . Consider enabling auto-escalation for NEWS2 scores above 8.
             </p>
           </div>
-        </aside>
-
-        {/* ── Right panel ──────────────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {!selectedPatient ? (
-            /* ── Empty state ─── */
-            <div className="flex h-full flex-col items-center justify-center text-center animate-fade-in">
-              <div
-                className="mb-6 flex h-24 w-24 items-center justify-center rounded-3xl"
-                style={{
-                  background: "rgba(15, 23, 42, 0.8)",
-                  border: "1px solid var(--border-default)",
-                  boxShadow: "var(--shadow-glow-blue)",
-                }}
-              >
-                <Stethoscope
-                  className="h-11 w-11"
-                  style={{ color: "rgba(59,130,246,0.5)" }}
-                />
-              </div>
-              <h2
-                className="text-2xl font-bold"
-                style={{ fontFamily: "var(--font-outfit)", color: "var(--text-secondary)" }}
-              >
-                Select a patient to begin
-              </h2>
-              <p
-                className="mt-2 text-sm"
-                style={{ color: "var(--text-tertiary)" }}
-              >
-                Search by name on the left, then click a patient to load their profile
-              </p>
-              <div
-                className="mt-8 flex items-center gap-2 text-xs rounded-full px-5 py-2.5"
-                style={{
-                  background: "rgba(59,130,246,0.06)",
-                  border: "1px solid rgba(59,130,246,0.15)",
-                  color: "rgba(148,163,184,0.7)",
-                }}
-              >
-                <ChevronRight className="h-3.5 w-3.5" style={{ color: "#3b82f6" }} />
-                Try searching for &ldquo;Smith&rdquo; to see a quick demo
-              </div>
-            </div>
-          ) : (
-            /* ── Patient workspace ─── */
-            <div
-              className="flex flex-col gap-5 max-w-5xl mx-auto animate-fade-in-up"
-              style={{ opacity: 0 }}
-            >
-              {/* Patient header bar */}
-              <div
-                className="flex items-center justify-between rounded-xl px-5 py-4"
-                style={{
-                  background: "rgba(13, 21, 38, 0.8)",
-                  border: "1px solid var(--border-default)",
-                }}
-              >
-                <div>
-                  <h2
-                    className="text-xl font-bold"
-                    style={{ fontFamily: "var(--font-outfit)", color: "var(--text-primary)" }}
-                  >
-                    {selectedPatient.name}
-                  </h2>
-                  <p
-                    className="mt-0.5 text-xs"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    {selectedPatient.gender} &middot; DOB: {selectedPatient.dob} &middot;{" "}
-                    <span
-                      className="font-mono text-[10px]"
-                      style={{ color: "var(--text-tertiary)" }}
-                    >
-                      ID: {selectedPatient.id}
-                    </span>
-                  </p>
-                </div>
-                {currentTriageResult ? (
-                  <RiskBadge
-                    tier={currentTriageResult.triage_tier}
-                    score={currentTriageResult.risk_score}
-                    news2Score={currentTriageResult.news2_score}
-                    size="lg"
-                  />
-                ) : (
-                  <span
-                    className="text-xs rounded-full px-3 py-1.5"
-                    style={{
-                      background: "rgba(51,65,85,0.4)",
-                      border: "1px solid rgba(51,65,85,0.6)",
-                      color: "var(--text-tertiary)",
-                    }}
-                  >
-                    Awaiting triage
-                  </span>
-                )}
-              </div>
-
-              {/* Vitals form */}
-              <VitalsForm
-                vitals={vitals}
-                onChange={setVitals}
-                onSubmit={handleTriageSubmit}
-                isLoading={isTriaging}
-                patientName={selectedPatient.name}
-              />
-
-              {/* Triage loading skeleton */}
-              {isTriaging && (
-                <div
-                  className="grid grid-cols-3 gap-4 animate-fade-in"
-                >
-                  <div
-                    className="col-span-1 h-48 rounded-xl skeleton"
-                  />
-                  <div
-                    className="col-span-2 h-48 rounded-xl skeleton"
-                  />
-                </div>
-              )}
-
-              {/* Triage results */}
-              {currentTriageResult && !isTriaging && (
-                <div
-                  className="flex flex-col gap-4 animate-fade-in-up"
-                >
-                  {/* Score card + Action center row */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-1">
-                      <TriageScoreCard result={currentTriageResult} />
-                    </div>
-                    <div className="col-span-2">
-                      <ActionCenter
-                        actions={currentTriageResult.suggested_actions}
-                        justification={currentTriageResult.justification}
-                        news2Score={currentTriageResult.news2_score}
-                        riskScore={currentTriageResult.risk_score}
-                        tier={currentTriageResult.triage_tier}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Vitals trend — full width */}
-                  <VitalsTrend
-                    currentHR={vitals.heart_rate}
-                    currentSpO2={vitals.spo2}
-                    currentRR={vitals.respiratory_rate}
-                    currentTemp={vitals.temperature}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
-    </div>
+        </div>
+      </section>
+    </ClinicalShell>
   );
 }

@@ -12,7 +12,6 @@ import {
   ReferenceLine,
   Area,
   AreaChart,
-  Legend,
 } from "recharts";
 
 interface VitalsTrendProps {
@@ -36,7 +35,6 @@ function generateTrend(
 
   return labels.map((time, i) => {
     const pct = i / (labels.length - 1);
-    // Add mild random jitter for realism
     const jitter = (Math.sin(i * 2.3) * 0.3 + Math.cos(i * 1.7) * 0.2);
     return {
       time,
@@ -64,16 +62,16 @@ const CustomTooltip = ({
   if (!active || !payload?.length) return null;
   return (
     <div
-      className="rounded-lg p-3 text-xs shadow-2xl"
+      className="rounded-lg p-3 text-xs shadow-2xl tabular-nums"
       style={{
-        background: "rgba(13, 21, 38, 0.95)",
-        border: "1px solid rgba(51, 65, 85, 0.6)",
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
         backdropFilter: "blur(12px)",
       }}
     >
       <p
         className="font-semibold mb-2"
-        style={{ color: "rgba(148,163,184,0.9)" }}
+        style={{ color: "var(--text-secondary)" }}
       >
         {label}
       </p>
@@ -117,7 +115,7 @@ export function VitalsTrend({
   const data = generateTrend(currentHR, currentSpO2, currentRR, currentTemp);
 
   return (
-    <div className="glass-card overflow-hidden">
+    <div className="glass-card overflow-hidden stagger-card">
       {/* Header */}
       <div
         className="flex items-center justify-between px-5 py-4"
@@ -126,22 +124,23 @@ export function VitalsTrend({
         <div className="flex items-center gap-2">
           <div
             className="flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{ background: "rgba(6, 182, 212, 0.12)" }}
+            style={{ background: "var(--accent-blue-dim)" }}
+            aria-hidden="true"
           >
-            <TrendingUp className="h-4 w-4" style={{ color: "#22d3ee" }} />
+            <TrendingUp className="h-4 w-4" style={{ color: "var(--accent-blue)" }} />
           </div>
-          <p
+          <h3
             className="text-sm font-semibold"
             style={{ fontFamily: "var(--font-outfit)", color: "var(--text-primary)" }}
           >
             Vitals Trend
-          </p>
+          </h3>
         </div>
         <span
-          className="text-[10px] rounded-full px-2.5 py-0.5"
+          className="text-[10px] rounded-full px-2.5 py-0.5 tabular-nums"
           style={{
-            background: "rgba(30,41,59,0.6)",
-            border: "1px solid rgba(51,65,85,0.4)",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-subtle)",
             color: "var(--text-tertiary)",
           }}
         >
@@ -149,163 +148,168 @@ export function VitalsTrend({
         </span>
       </div>
 
-      <div className="p-5 grid grid-cols-2 gap-6">
+      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* HR + SpO2 chart */}
-        <div>
+        <section aria-label="Heart Rate and Oxygen Saturation Trends">
           <p
             className="mb-3 text-[10px] font-semibold uppercase tracking-wider"
             style={{ color: "var(--text-muted)" }}
           >
             Heart Rate &amp; SpO₂
           </p>
-          <ResponsiveContainer width="100%" height={140}>
-            <AreaChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-              <defs>
-                <linearGradient id="hrGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.18} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="spo2Grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(51,65,85,0.25)" vertical={false} />
-              <XAxis
-                dataKey="time"
-                tick={{ fontSize: 9, fill: "#475569" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 9, fill: "#475569" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              {/* HR normal range ref lines */}
-              <ReferenceLine y={60} stroke="rgba(239,68,68,0.15)" strokeDasharray="4 3" />
-              <ReferenceLine y={100} stroke="rgba(239,68,68,0.15)" strokeDasharray="4 3" />
-              <Area
-                type="monotone"
-                dataKey="hr"
-                name="HR"
-                stroke="#ef4444"
-                fill="url(#hrGrad)"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, fill: "#ef4444" }}
-              />
-              <Area
-                type="monotone"
-                dataKey="spo2"
-                name="SpO₂"
-                stroke="#3b82f6"
-                fill="url(#spo2Grad)"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, fill: "#3b82f6" }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div role="img" aria-label={`Heart Rate trend ending at ${currentHR} bpm and Oxygen Saturation trend ending at ${currentSpO2}%`}>
+            <ResponsiveContainer width="100%" height={140}>
+              <AreaChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="hrGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.18} />
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="spo2Grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(51,65,85,0.1)" vertical={false} />
+                <XAxis
+                  dataKey="time"
+                  tick={{ fontSize: 9, fill: "var(--text-muted)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 9, fill: "var(--text-muted)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <ReferenceLine y={60} stroke="rgba(239,68,68,0.15)" strokeDasharray="4 3" />
+                <ReferenceLine y={100} stroke="rgba(239,68,68,0.15)" strokeDasharray="4 3" />
+                <Area
+                  type="monotone"
+                  dataKey="hr"
+                  name="HR"
+                  stroke="#ef4444"
+                  fill="url(#hrGrad)"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, fill: "#ef4444" }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="spo2"
+                  name="SpO₂"
+                  stroke="#3b82f6"
+                  fill="url(#spo2Grad)"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, fill: "#3b82f6" }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
           <div className="mt-2 flex items-center gap-4 text-[10px]" style={{ color: "var(--text-muted)" }}>
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+              <span className="inline-block h-2 w-2 rounded-full bg-red-500" aria-hidden="true" />
               Heart Rate (bpm)
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
+              <span className="inline-block h-2 w-2 rounded-full bg-blue-500" aria-hidden="true" />
               SpO₂ (%)
             </span>
           </div>
-        </div>
+        </section>
 
         {/* RR + Temp chart */}
-        <div>
+        <section aria-label="Respiratory Rate and Temperature Trends">
           <p
             className="mb-3 text-[10px] font-semibold uppercase tracking-wider"
             style={{ color: "var(--text-muted)" }}
           >
             Resp. Rate &amp; Temperature
           </p>
-          <ResponsiveContainer width="100%" height={140}>
-            <LineChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(51,65,85,0.25)" vertical={false} />
-              <XAxis
-                dataKey="time"
-                tick={{ fontSize: 9, fill: "#475569" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 9, fill: "#475569" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={20} stroke="rgba(20,184,166,0.15)" strokeDasharray="4 3" />
-              <ReferenceLine y={38} stroke="rgba(245,158,11,0.15)" strokeDasharray="4 3" />
-              <Line
-                type="monotone"
-                dataKey="rr"
-                name="Resp. Rate"
-                stroke="#14b8a6"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, fill: "#14b8a6" }}
-              />
-              <Line
-                type="monotone"
-                dataKey="temp"
-                name="Temp"
-                stroke="#f59e0b"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, fill: "#f59e0b" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <div role="img" aria-label={`Respiratory Rate trend ending at ${currentRR} breaths per minute and Temperature trend ending at ${currentTemp} degrees Celsius`}>
+            <ResponsiveContainer width="100%" height={140}>
+              <LineChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(51,65,85,0.1)" vertical={false} />
+                <XAxis
+                  dataKey="time"
+                  tick={{ fontSize: 9, fill: "var(--text-muted)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 9, fill: "var(--text-muted)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <ReferenceLine y={20} stroke="rgba(20,184,166,0.15)" strokeDasharray="4 3" />
+                <ReferenceLine y={38} stroke="rgba(245,158,11,0.15)" strokeDasharray="4 3" />
+                <Line
+                  type="monotone"
+                  dataKey="rr"
+                  name="Resp. Rate"
+                  stroke="#14b8a6"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, fill: "#14b8a6" }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="temp"
+                  name="Temp"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, fill: "#f59e0b" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
           <div className="mt-2 flex items-center gap-4 text-[10px]" style={{ color: "var(--text-muted)" }}>
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#14b8a6" }} />
+              <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#14b8a6" }} aria-hidden="true" />
               Resp. Rate (/min)
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} />
+              <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} aria-hidden="true" />
               Temp (°C)
             </span>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Current snapshot row */}
       <div
-        className="grid grid-cols-4 gap-0"
+        className="grid grid-cols-2 sm:grid-cols-4 gap-0"
         style={{ borderTop: "1px solid var(--border-subtle)" }}
+        aria-label="Current vital signs snapshot"
       >
         {[
-          { label: "Heart Rate", value: currentHR, unit: "bpm", color: "#ef4444" },
+          { label: "Heart Rate", value: currentHR, unit: "bpm", color: "var(--color-critical-text)" },
           { label: "SpO₂", value: currentSpO2, unit: "%", color: "#3b82f6" },
           { label: "Resp. Rate", value: currentRR, unit: "/min", color: "#14b8a6" },
-          { label: "Temperature", value: currentTemp, unit: "°C", color: "#f59e0b" },
+          { label: "Temperature", value: currentTemp, unit: "°C", color: "var(--color-urgent-text)" },
         ].map(({ label, value, unit, color }, i) => (
           <div
             key={label}
-            className="flex flex-col items-center py-3"
+            className="flex flex-col items-center py-6 px-2"
             style={{
-              borderRight: i < 3 ? "1px solid var(--border-subtle)" : "none",
+              borderRight: i % 4 !== 3 ? "1px solid var(--border-subtle)" : "none",
+              borderBottom: i < 0 ? "1px solid var(--border-subtle)" : "none",
             }}
           >
             <span
-              className="text-lg font-bold"
+              className="text-xl font-bold tabular-nums"
               style={{ color, fontFamily: "var(--font-outfit)" }}
             >
               {value}
             </span>
-            <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>
+            <span className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>
               {unit}
             </span>
-            <span className="text-[9px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>
+            <span className="text-[10px] uppercase tracking-wider mt-1 opacity-70" style={{ color: "var(--text-tertiary)" }}>
               {label}
             </span>
           </div>
