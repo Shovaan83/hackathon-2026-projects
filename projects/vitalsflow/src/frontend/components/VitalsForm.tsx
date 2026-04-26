@@ -148,9 +148,9 @@ export function VitalsForm({
         <div className="flex items-center gap-2">
           <div
             className="flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{ background: "rgba(59,130,246,0.15)" }}
+            style={{ background: "var(--accent-blue-dim)" }}
           >
-            <Thermometer className="h-4 w-4" style={{ color: "#60a5fa" }} />
+            <Thermometer className="h-4 w-4" style={{ color: "var(--accent-blue)" }} />
           </div>
           <div>
             <p
@@ -167,8 +167,8 @@ export function VitalsForm({
         <div
           className="flex items-center gap-1.5 text-[10px] rounded-full px-3 py-1"
           style={{
-            background: "rgba(30,41,59,0.6)",
-            border: "1px solid rgba(51,65,85,0.5)",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-subtle)",
             color: "var(--text-tertiary)",
           }}
         >
@@ -185,6 +185,8 @@ export function VitalsForm({
             const status = getFieldStatus(val, warnLow, warnHigh);
             const colors = statusColors[status];
 
+            const hintId = `vital-${key}-hint`;
+            const isInvalid = status === "critical" || status === "warn";
             return (
               <div key={key} className="flex flex-col gap-1">
                 <label
@@ -198,20 +200,25 @@ export function VitalsForm({
                   <input
                     id={`vital-${key}`}
                     type="number"
+                    inputMode="decimal"
                     step={step}
                     min={min}
                     max={max}
                     value={val}
+                    aria-invalid={isInvalid ? true : undefined}
+                    aria-describedby={hintId}
                     onChange={(e) =>
                       update(key, parseFloat(e.target.value) as VitalsPayload[typeof key])
                     }
-                    className="w-full rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-all duration-200"
+                    className="w-full rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-all duration-200 tabular-nums"
                     style={{
-                      background: "rgba(15, 23, 42, 0.85)",
+                      background: "var(--bg-surface)",
                       border: `1px solid ${colors.border}`,
                       color: "var(--text-primary)",
                       outline: "none",
                       fontFamily: "var(--font-inter)",
+                      minHeight: "40px",
+                      touchAction: "manipulation",
                     }}
                     onFocus={(e) => {
                       e.currentTarget.style.boxShadow = `0 0 0 3px ${colors.focus}`;
@@ -223,10 +230,11 @@ export function VitalsForm({
                   />
                 </div>
                 <p
+                  id={hintId}
                   className="text-[8px] sm:text-[9px]"
                   style={{ color: colors.text }}
                 >
-                  {unit} · {hint}
+                  {unit} · {hint}{isInvalid ? (status === "critical" ? " ⚠ Out of range" : " ⚠ Check value") : ""}
                 </p>
               </div>
             );
@@ -247,13 +255,16 @@ export function VitalsForm({
               id="vital-consciousness"
               value={vitals.consciousness}
               onChange={(e) => update("consciousness", e.target.value)}
+              aria-describedby="vital-consciousness-hint"
               className="rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm transition-all duration-200"
               style={{
-                background: "rgba(15, 23, 42, 0.85)",
+                background: "var(--bg-surface)",
                 border: "1px solid var(--border-default)",
                 color: "var(--text-primary)",
                 outline: "none",
                 fontFamily: "var(--font-inter)",
+                minHeight: "40px",
+                touchAction: "manipulation",
               }}
               onFocus={(e) => {
                 e.currentTarget.style.boxShadow = "0 0 0 3px rgba(59,130,246,0.2)";
@@ -265,7 +276,7 @@ export function VitalsForm({
               }}
             >
               {["alert", "voice", "pain", "unresponsive"].map((opt) => (
-                <option key={opt} value={opt} style={{ background: "#0d1117" }}>
+                <option key={opt} value={opt} style={{ background: "var(--bg-surface)" }}>
                   {opt.charAt(0).toUpperCase() + opt.slice(1)}
                   {opt === "alert" ? " (A)" : opt === "voice" ? " (V)" : opt === "pain" ? " (P)" : " (U)"}
                 </option>
@@ -284,9 +295,9 @@ export function VitalsForm({
               className="flex items-center gap-3 cursor-pointer rounded-lg px-2 sm:px-3 py-1.5 sm:py-2"
               style={{
                 background: vitals.on_supplemental_o2
-                  ? "rgba(59,130,246,0.08)"
-                  : "rgba(15,23,42,0.6)",
-                border: `1px solid ${vitals.on_supplemental_o2 ? "rgba(59,130,246,0.3)" : "var(--border-default)"}`,
+                  ? "var(--accent-blue-dim)"
+                  : "var(--bg-surface)",
+                border: `1px solid ${vitals.on_supplemental_o2 ? "var(--accent-blue)" : "var(--border-default)"}`,
                 transition: "all 0.2s",
               }}
             >
@@ -303,7 +314,7 @@ export function VitalsForm({
                   style={{
                     background: vitals.on_supplemental_o2
                       ? "var(--accent-blue)"
-                      : "rgba(51,65,85,0.6)",
+                      : "var(--border-strong)",
                   }}
                 />
                 <div
@@ -317,7 +328,7 @@ export function VitalsForm({
               </div>
               <span
                 className="text-xs sm:text-sm select-none"
-                style={{ color: vitals.on_supplemental_o2 ? "#93c5fd" : "var(--text-secondary)" }}
+                style={{ color: vitals.on_supplemental_o2 ? "var(--accent-blue)" : "var(--text-secondary)" }}
               >
                 {vitals.on_supplemental_o2 ? "Patient on O₂" : "Room air (off)"}
               </span>

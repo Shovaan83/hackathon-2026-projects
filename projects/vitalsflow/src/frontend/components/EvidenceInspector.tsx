@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, AlertCircle, Zap, Brain } from "lucide-react";
+import { ChevronDown, ChevronUp, AlertCircle, Brain, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import type { TriageResult, VitalsPayload } from "@/lib/api";
 
@@ -48,19 +48,16 @@ const NEWS2_THRESHOLDS = {
   }},
 };
 
-function assessVitalStatus(
-  value: number,
-  threshold: { low: number; high: number }
-): "normal" | "warning" | "critical" {
-  if (value < threshold.low) return "critical";
-  if (value > threshold.high) return "critical";
-  return "normal";
-}
+// Tier → resolved hex (CSS vars don't work in inline SVG contexts reliably)
+const tierHex: Record<string, { color: string; bg: string; border: string }> = {
+  critical: { color: "#ef4444", bg: "rgba(239,68,68,0.06)", border: "rgba(239,68,68,0.25)" },
+  urgent:   { color: "#f59e0b", bg: "rgba(245,158,11,0.06)", border: "rgba(245,158,11,0.25)" },
+  routine:  { color: "#22c55e", bg: "rgba(34,197,94,0.06)",  border: "rgba(34,197,94,0.22)" },
+};
 
 export function EvidenceInspector({ result, vitals }: EvidenceInspectorProps) {
   const [expanded, setExpanded] = useState(false);
 
-  // Calculate NEWS2 scores for each component
   const componentScores = {
     respiratory_rate: NEWS2_THRESHOLDS.respiratory_rate.points(vitals.respiratory_rate),
     spo2: NEWS2_THRESHOLDS.oxygen_saturation.points(vitals.spo2),
@@ -70,107 +67,65 @@ export function EvidenceInspector({ result, vitals }: EvidenceInspectorProps) {
   };
 
   const breachedVitals = [
-    {
-      name: "Respiratory Rate",
-      value: vitals.respiratory_rate,
-      unit: "/min",
-      threshold: NEWS2_THRESHOLDS.respiratory_rate,
-      score: componentScores.respiratory_rate,
-    },
-    {
-      name: "SpO2",
-      value: vitals.spo2,
-      unit: "%",
-      threshold: NEWS2_THRESHOLDS.oxygen_saturation,
-      score: componentScores.spo2,
-    },
-    {
-      name: "Temperature",
-      value: vitals.temperature,
-      unit: "°C",
-      threshold: NEWS2_THRESHOLDS.temperature,
-      score: componentScores.temperature,
-    },
-    {
-      name: "Systolic BP",
-      value: vitals.systolic_bp,
-      unit: "mmHg",
-      threshold: NEWS2_THRESHOLDS.systolic_bp,
-      score: componentScores.systolic_bp,
-    },
-    {
-      name: "Heart Rate",
-      value: vitals.heart_rate,
-      unit: "bpm",
-      threshold: NEWS2_THRESHOLDS.heart_rate,
-      score: componentScores.heart_rate,
-    },
+    { name: "Respiratory Rate", value: vitals.respiratory_rate, unit: "/min",  threshold: NEWS2_THRESHOLDS.respiratory_rate,  score: componentScores.respiratory_rate },
+    { name: "SpO₂",            value: vitals.spo2,              unit: "%",     threshold: NEWS2_THRESHOLDS.oxygen_saturation,  score: componentScores.spo2 },
+    { name: "Temperature",     value: vitals.temperature,       unit: "°C",    threshold: NEWS2_THRESHOLDS.temperature,        score: componentScores.temperature },
+    { name: "Systolic BP",     value: vitals.systolic_bp,       unit: "mmHg",  threshold: NEWS2_THRESHOLDS.systolic_bp,        score: componentScores.systolic_bp },
+    { name: "Heart Rate",      value: vitals.heart_rate,        unit: "bpm",   threshold: NEWS2_THRESHOLDS.heart_rate,         score: componentScores.heart_rate },
   ].filter((v) => v.score > 0);
 
-  const tierColor =
-    result.triage_tier === "critical"
-      ? "#ef4444"
-      : result.triage_tier === "urgent"
-      ? "#f59e0b"
-      : result.triage_tier === "routine"
-      ? "#22c55e"
-      : "#3b82f6";
+  const tier = result.triage_tier in tierHex ? result.triage_tier : "routine";
+  const { color: tierColor, bg: tierBg, border: tierBorder } = tierHex[tier];
 
-  const tierBg =
-    result.triage_tier === "critical"
-      ? "rgba(239, 68, 68, 0.06)"
-      : result.triage_tier === "urgent"
-      ? "rgba(245, 158, 11, 0.06)"
-      : result.triage_tier === "routine"
-      ? "rgba(34, 197, 94, 0.06)"
-      : "rgba(59, 130, 246, 0.06)";
+  const panelId = "evidence-panel";
 
   return (
     <div
-      className="rounded-lg border overflow-hidden"
-      style={{
-        background: tierBg,
-        border: `1px solid ${tierColor}`,
-        opacity: 0.95,
-      }}
+      className="rounded-lg overflow-hidden"
+      style={{ background: tierBg, border: `1px solid ${tierBorder}` }}
     >
-      {/* Header */}
+      {/* Toggle button — SKILL.md: aria-expanded, state-transition */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:opacity-90 transition-opacity"
-        style={{ background: tierBg }}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        className="w-full flex items-center justify-between px-4 py-3 transition-opacity hover:opacity-90 clickable"
+        style={{ background: tierBg, minHeight: "44px" }}
       >
         <div className="flex items-center gap-3">
-          <Brain className="h-5 w-5" style={{ color: tierColor }} />
+          <Brain className="h-5 w-5" style={{ color: tierColor }} aria-hidden="true" />
           <span className="font-semibold text-sm" style={{ color: tierColor }}>
-            Evidence & Scoring
+            Evidence &amp; Scoring
           </span>
         </div>
-        {expanded ? (
-          <ChevronUp className="h-4 w-4" style={{ color: tierColor }} />
-        ) : (
-          <ChevronDown className="h-4 w-4" style={{ color: tierColor }} />
-        )}
+        {expanded
+          ? <ChevronUp className="h-4 w-4" style={{ color: tierColor }} aria-hidden="true" />
+          : <ChevronDown className="h-4 w-4" style={{ color: tierColor }} aria-hidden="true" />
+        }
       </button>
 
-      {/* Expanded Content */}
+      {/* Expanded content — smooth entrance animation (SKILL.md: expand-down) */}
       {expanded && (
         <div
-          className="border-t px-4 py-4 space-y-4"
-          style={{
-            borderColor: tierColor,
-            opacity: 0.95,
-          }}
+          id={panelId}
+          role="region"
+          aria-label="Clinical evidence and scoring"
+          className="border-t px-4 py-4 space-y-4 expand-down"
+          style={{ borderColor: `${tierColor}40` }}
         >
           {/* Why This Risk? */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase mb-3" style={{ color: tierColor }}>
+          <section aria-labelledby="why-risk-heading">
+            <h4
+              id="why-risk-heading"
+              className="text-xs font-semibold uppercase mb-3"
+              style={{ color: tierColor }}
+            >
               Why This Risk?
             </h4>
             {breachedVitals.length > 0 ? (
-              <div className="space-y-2">
+              <ul className="space-y-2" aria-label="Breached vital signs">
                 {breachedVitals.map((vital) => (
-                  <div
+                  <li
                     key={vital.name}
                     className="flex items-start gap-2 rounded px-2.5 py-2 text-xs"
                     style={{
@@ -178,112 +133,133 @@ export function EvidenceInspector({ result, vitals }: EvidenceInspectorProps) {
                       borderLeft: `2px solid ${tierColor}`,
                     }}
                   >
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: tierColor }} />
+                    <AlertCircle
+                      className="h-3.5 w-3.5 shrink-0 mt-0.5"
+                      style={{ color: tierColor }}
+                      aria-hidden="true"
+                    />
                     <span style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--text-primary)" }}>
+                      <strong className="tabular-nums" style={{ color: "var(--text-primary)" }}>
                         {vital.name}: {vital.value.toFixed(1)}
                       </strong>{" "}
-                      {vital.unit} (normal: {vital.threshold.low}–{vital.threshold.high}) — +
-                      {vital.score} NEWS2 point{vital.score !== 1 ? "s" : ""}
+                      {vital.unit} (normal: {vital.threshold.low}–{vital.threshold.high}) — +{vital.score} NEWS2 pt{vital.score !== 1 ? "s" : ""}
                     </span>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : (
               <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
                 All vitals within expected range. Risk driven by combination factors.
               </p>
             )}
-          </div>
+          </section>
 
-          {/* Scoring Breakdown */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase mb-3" style={{ color: tierColor }}>
+          {/* NEWS2 Breakdown */}
+          <section aria-labelledby="news2-breakdown-heading">
+            <h4
+              id="news2-breakdown-heading"
+              className="text-xs font-semibold uppercase mb-3"
+              style={{ color: tierColor }}
+            >
               NEWS2 Breakdown
             </h4>
-            <div className="space-y-1">
-              {Object.entries(componentScores).map(([key, points]) => (
-                <div key={key} className="flex items-center justify-between text-xs">
-                  <span style={{ color: "var(--text-secondary)" }}>
-                    {key === "respiratory_rate"
-                      ? "Respiratory Rate"
-                      : key === "spo2"
-                      ? "SpO2"
-                      : key === "systolic_bp"
-                      ? "Systolic BP"
-                      : key === "heart_rate"
-                      ? "Heart Rate"
-                      : "Temperature"}
-                  </span>
-                  <span
-                    className="font-semibold px-2 py-0.5 rounded"
-                    style={{
-                      background: points > 0 ? `${tierColor}20` : "rgba(34, 197, 94, 0.15)",
-                      color: points > 0 ? tierColor : "#4ade80",
-                    }}
-                  >
-                    {points} pt{points !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              ))}
-              <div
-                className="flex items-center justify-between text-xs border-t pt-2 mt-2"
-                style={{ borderColor: "rgba(148, 163, 184, 0.1)" }}
-              >
-                <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-                  Total NEWS2
-                </span>
-                <span
-                  className="font-bold px-2 py-0.5 rounded"
-                  style={{
-                    background: `${tierColor}25`,
-                    color: tierColor,
-                  }}
+            <table className="w-full" aria-label="NEWS2 component scores">
+              <tbody className="space-y-1">
+                {Object.entries(componentScores).map(([key, points]) => (
+                  <tr key={key} className="flex items-center justify-between text-xs py-0.5">
+                    <td style={{ color: "var(--text-secondary)" }}>
+                      {key === "respiratory_rate" ? "Respiratory Rate"
+                        : key === "spo2"          ? "SpO₂"
+                        : key === "systolic_bp"   ? "Systolic BP"
+                        : key === "heart_rate"    ? "Heart Rate"
+                        : "Temperature"}
+                    </td>
+                    <td>
+                      <span
+                        className="font-semibold tabular-nums px-2 py-0.5 rounded"
+                        style={{
+                          background: points > 0 ? `${tierColor}20` : "rgba(34,197,94,0.15)",
+                          color: points > 0 ? tierColor : "#16a34a",
+                        }}
+                      >
+                        {points} pt{points !== 1 ? "s" : ""}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {/* Total row */}
+                <tr
+                  className="flex items-center justify-between text-xs border-t pt-2 mt-2"
+                  style={{ borderColor: "rgba(148,163,184,0.15)" }}
                 >
-                  {result.news2_score}
-                </span>
-              </div>
-            </div>
-          </div>
+                  <td style={{ color: "var(--text-primary)", fontWeight: 600 }}>Total NEWS2</td>
+                  <td>
+                    <span
+                      className="font-bold tabular-nums px-2 py-0.5 rounded"
+                      style={{ background: `${tierColor}25`, color: tierColor }}
+                    >
+                      {result.news2_score}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
 
-          {/* AI Confidence */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase mb-3" style={{ color: tierColor }}>
+          {/* AI Analysis */}
+          <section aria-labelledby="ai-analysis-heading">
+            <h4
+              id="ai-analysis-heading"
+              className="text-xs font-semibold uppercase mb-3"
+              style={{ color: tierColor }}
+            >
               AI Analysis
             </h4>
             <div
               className="rounded px-3 py-2 text-xs"
               style={{
-                background: "rgba(148, 163, 184, 0.05)",
-                border: "1px solid rgba(148, 163, 184, 0.1)",
+                background: "rgba(148,163,184,0.06)",
+                border: "1px solid rgba(148,163,184,0.12)",
               }}
             >
               <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                <strong style={{ color: "var(--text-primary)" }}>Triage Tier:</strong> {result.triage_tier.toUpperCase()} · Risk Score: {result.risk_score}/10
+                <strong style={{ color: "var(--text-primary)" }}>Triage Tier:</strong>{" "}
+                <span className="tabular-nums">{result.triage_tier.toUpperCase()}</span>{" "}
+                · Risk Score:{" "}
+                <span className="tabular-nums">{result.risk_score}/10</span>
               </p>
-              <p style={{ color: "var(--text-tertiary)", fontSize: "10px", marginTop: "6px" }}>
-                ⚠️ Model output; human clinical review is mandatory. Use as decision support only.
+              {/* Replaced emoji ⚠️ with SVG icon (SKILL.md: no-emoji-icons) */}
+              <p
+                className="flex items-center gap-1.5 mt-2"
+                style={{ color: "var(--text-tertiary)", fontSize: "10px" }}
+              >
+                <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden="true" />
+                Model output; human clinical review is mandatory. Use as decision support only.
               </p>
             </div>
-          </div>
+          </section>
 
-          {/* Justification */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase mb-2" style={{ color: tierColor }}>
+          {/* Clinical Rationale */}
+          <section aria-labelledby="rationale-heading">
+            <h4
+              id="rationale-heading"
+              className="text-xs font-semibold uppercase mb-2"
+              style={{ color: tierColor }}
+            >
               Clinical Rationale
             </h4>
             <p
               className="text-xs rounded px-3 py-2"
               style={{
                 color: "var(--text-secondary)",
-                background: "rgba(148, 163, 184, 0.05)",
-                border: "1px solid rgba(148, 163, 184, 0.1)",
-                lineHeight: 1.6,
+                background: "rgba(148,163,184,0.06)",
+                border: "1px solid rgba(148,163,184,0.12)",
+                lineHeight: 1.65,
               }}
             >
               {result.justification}
             </p>
-          </div>
+          </section>
         </div>
       )}
     </div>
