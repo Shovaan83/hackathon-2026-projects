@@ -21,20 +21,30 @@ export function PatientCard({
   const tier = triageResult?.triage_tier;
   const accentColor =
     tier === "critical"
-      ? "#ef4444"
+      ? "var(--color-critical)"
       : tier === "urgent"
-      ? "#f59e0b"
+      ? "var(--color-urgent)"
       : tier === "routine"
-      ? "#22c55e"
-      : "#3b82f6";
+      ? "var(--color-routine)"
+      : "var(--accent-blue)";
 
   return (
     <div
       id={`patient-card-${patient.id}`}
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      aria-pressed={isSelected}
+      aria-label={`Patient: ${patient.name}${triageResult ? `, ${triageResult.triage_tier} triage tier, NEWS2 score ${triageResult.news2_score}` : ", not assessed"}`}
       className={cn(
-        "relative cursor-pointer transition-all duration-200",
-        "group"
+        "relative clickable transition-all",
+        "group focus-visible:outline-2 focus-visible:outline-[var(--accent-blue)]"
       )}
       style={{
         borderBottom: "1px solid var(--border-subtle)",
@@ -43,29 +53,33 @@ export function PatientCard({
           ? "rgba(59, 130, 246, 0.05)"
           : "transparent",
         padding: "14px 16px",
+        /* Scale hover (SKILL.md: scale-feedback) */
+        transition: "background 180ms ease-out, border-color 180ms ease-out, transform 150ms ease-out",
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected) (e.currentTarget as HTMLElement).style.background = "rgba(13,77,138,0.04)";
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) (e.currentTarget as HTMLElement).style.background = "transparent";
       }}
     >
-      {/* Hover overlay */}
-      <div
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-        style={{ background: "rgba(255,255,255,0.02)", pointerEvents: "none" }}
-      />
-
       {/* Top row */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold text-sm transition-all"
             style={{
               background: isSelected
-                ? "rgba(59,130,246,0.15)"
-                : "rgba(30,41,59,0.6)",
-              border: `1px solid ${isSelected ? "rgba(59,130,246,0.3)" : "rgba(51,65,85,0.5)"}`,
+                ? "var(--accent-blue-dim)"
+                : "var(--bg-elevated)",
+              border: `2px solid ${isSelected ? "var(--accent-blue)" : "var(--border-default)"}`,
+              boxShadow: isSelected ? "0 0 12px rgba(59,130,246,0.15)" : "none",
             }}
+            aria-hidden="true"
           >
             <User
-              className="h-3.5 w-3.5"
-              style={{ color: isSelected ? "#60a5fa" : "var(--text-tertiary)" }}
+              className="h-4 w-4"
+              style={{ color: isSelected ? "var(--accent-blue)" : "var(--text-tertiary)", strokeWidth: 2.5 }}
             />
           </div>
           <span
@@ -88,8 +102,8 @@ export function PatientCard({
             <span
               className="text-[10px] px-2 py-0.5 rounded-full"
               style={{
-                background: "rgba(30,41,59,0.5)",
-                border: "1px solid rgba(51,65,85,0.4)",
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-subtle)",
                 color: "var(--text-muted)",
               }}
             >

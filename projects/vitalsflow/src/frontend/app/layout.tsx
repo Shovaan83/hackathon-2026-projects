@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Inter, Outfit, Public_Sans } from "next/font/google";
 import "./globals.css";
+import { ClinicalShell } from "@/components/ClinicalShell";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -14,29 +15,29 @@ const outfit = Outfit({
   variable: "--font-outfit",
 });
 
+const publicSans = Public_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-public-sans",
+});
+
 export const metadata: Metadata = {
-  title: "VitalsFlow — AI-Powered Clinical Triage",
-  description:
-    "AI-powered predictive triage using HL7 FHIR R4 and the clinically validated NEWS2 protocol. Powered by Gemini 1.5 Flash.",
-  keywords: [
-    "clinical triage",
-    "NEWS2",
-    "FHIR",
-    "AI healthcare",
-    "patient safety",
-    "Gemini",
-  ],
+  title: "VitalsFlow — AI Clinical Triage System",
+  description: "AI-assisted clinical decision support system",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className={`h-full ${inter.variable} ${outfit.variable}`}>
-      <body className="h-full bg-slate-950 antialiased overflow-hidden">
-        {/* Animated mesh background */}
-        <div className="bg-mesh" aria-hidden="true" />
-        {children}
+    <html
+      lang="en"
+      className={`h-full ${inter.variable} ${outfit.variable} ${publicSans.variable}`}
+    >
+      <body className="h-full antialiased" suppressHydrationWarning>
+        <ClinicalShell>{children}</ClinicalShell>
       </body>
     </html>
   );

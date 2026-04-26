@@ -8,62 +8,70 @@ interface TriageScoreCardProps {
 
 type Tier = "critical" | "urgent" | "routine";
 
+// Uses semantic CSS tokens — no raw hex
 const tierMeta: Record<Tier, { color: string; bg: string; label: string; stroke: string }> = {
   critical: {
-    color: "#ef4444",
-    bg: "rgba(239, 68, 68, 0.1)",
+    color: "var(--color-critical)",
+    bg: "var(--color-critical-bg)",
     label: "CRITICAL",
-    stroke: "#ef4444",
+    stroke: "var(--color-critical)",
   },
   urgent: {
-    color: "#f59e0b",
-    bg: "rgba(245, 158, 11, 0.1)",
+    color: "var(--color-urgent)",
+    bg: "var(--color-urgent-bg)",
     label: "URGENT",
-    stroke: "#f59e0b",
+    stroke: "var(--color-urgent)",
   },
   routine: {
-    color: "#22c55e",
-    bg: "rgba(34, 197, 94, 0.1)",
+    color: "var(--color-routine)",
+    bg: "var(--color-routine-bg)",
     label: "ROUTINE",
-    stroke: "#22c55e",
+    stroke: "var(--color-routine)",
   },
 };
 
-const CIRCUMFERENCE = 2 * Math.PI * 45; // r=45
+// Map tier label → resolved hex for SVG (SVG doesn't read CSS custom properties)
+const tierHex: Record<Tier, { color: string; stroke: string; strokeDim: string }> = {
+  critical: { color: "#ef4444", stroke: "#ef4444", strokeDim: "#ef444499" },
+  urgent:   { color: "#f59e0b", stroke: "#f59e0b", strokeDim: "#f59e0b99" },
+  routine:  { color: "#22c55e", stroke: "#22c55e", strokeDim: "#22c55e99" },
+};
 
 function ScoreRing({
   score,
   max,
-  color,
-  strokeColor,
+  hexColor,
+  hexStroke,
   size = 110,
-  label,
   sublabel,
+  ringId,
 }: {
   score: number;
   max: number;
-  color: string;
-  strokeColor: string;
+  hexColor: string;
+  hexStroke: string;
   size?: number;
-  label: string;
   sublabel: string;
+  ringId: string;
 }) {
-  const pct = Math.min(score / max, 1);
   const r = 45;
   const circumference = 2 * Math.PI * r;
+  const pct = Math.min(score / max, 1);
   const dashOffset = circumference * (1 - pct);
 
   return (
     <div className="flex flex-col items-center gap-1">
+      {/* Accessible SVG: role + title for screen readers */}
       <svg
         width={size}
         height={size}
         viewBox="0 0 110 110"
         style={{ overflow: "visible" }}
+        role="img"
+        aria-label={`${sublabel}: ${score} out of ${max}`}
       >
-        {/* Glow filter */}
         <defs>
-          <filter id={`glow-${label}`} x="-50%" y="-50%" width="200%" height="200%">
+          <filter id={`glow-${ringId}`} x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3" result="coloredBlur" />
             <feMerge>
               <feMergeNode in="coloredBlur" />
@@ -78,17 +86,17 @@ function ScoreRing({
           cy="55"
           r={r}
           fill="none"
-          stroke="rgba(30, 41, 59, 0.8)"
+          stroke="rgba(27,56,84,0.15)"
           strokeWidth="8"
         />
 
-        {/* Progress */}
+        {/* Progress ring */}
         <circle
           cx="55"
           cy="55"
           r={r}
           fill="none"
-          stroke={strokeColor}
+          stroke={hexStroke}
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -96,20 +104,23 @@ function ScoreRing({
           transform="rotate(-90 55 55)"
           style={{
             transition: "stroke-dashoffset 1.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            willChange: "stroke-dashoffset",
           }}
-          filter={`url(#glow-${label})`}
+          filter={`url(#glow-${ringId})`}
         />
 
-        {/* Center label */}
+        {/* Center score — tabular-nums via font-feature-settings */}
         <text
           x="55"
           y="50"
           textAnchor="middle"
           dominantBaseline="middle"
-          fill={color}
+          fill={hexColor}
           fontSize="22"
           fontWeight="700"
           fontFamily="'Outfit', sans-serif"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+          aria-hidden="true"
         >
           {score}
         </text>
@@ -118,17 +129,19 @@ function ScoreRing({
           y="67"
           textAnchor="middle"
           dominantBaseline="middle"
-          fill="rgba(148,163,184,0.6)"
+          fill="var(--text-tertiary)"
           fontSize="8"
           fontFamily="'Inter', sans-serif"
           fontWeight="500"
+          aria-hidden="true"
         >
           /{max}
         </text>
       </svg>
+
       <p
-        className="text-[10px] font-semibold uppercase tracking-wider text-center"
-        style={{ color: "rgba(148,163,184,0.7)" }}
+        className="mt-2 text-center text-xs font-semibold uppercase tracking-wider"
+        style={{ color: "var(--text-secondary)" }}
       >
         {sublabel}
       </p>
@@ -141,30 +154,29 @@ export function TriageScoreCard({ result }: TriageScoreCardProps) {
     ? (result.triage_tier as Tier)
     : "routine";
   const meta = tierMeta[tier];
-  const glowClass =
-    tier === "critical"
-      ? "glow-critical"
-      : tier === "urgent"
-      ? "glow-urgent"
-      : "glow-routine";
+  const hex = tierHex[tier];
 
   return (
     <div
-      className={`glass-card flex flex-col items-center gap-5 p-5 h-full ${glowClass}`}
+      className="glass-card flex h-full flex-col items-center gap-5 p-5"
       style={{
-        background: `linear-gradient(160deg, ${meta.bg}, rgba(13,21,38,0.9))`,
-        borderColor: `${meta.color}33`,
+        background: meta.bg,
+        borderColor: hex.color + "33",
       }}
+      // Announce the triage tier to screen readers as a status region
+      aria-live="polite"
+      aria-label={`Triage result: ${meta.label}. Risk score ${result.risk_score} out of 10. NEWS2 score ${result.news2_score}.`}
     >
       {/* Tier badge */}
       <div
-        className="w-full text-center rounded-lg py-2 font-bold text-sm tracking-widest uppercase"
+        className="w-full rounded-lg py-2 text-center text-sm font-bold uppercase tracking-widest"
         style={{
           fontFamily: "var(--font-outfit)",
-          background: `${meta.color}18`,
-          border: `1px solid ${meta.color}40`,
-          color: meta.color,
+          background: hex.color + "18",
+          border: "1px solid " + hex.color + "40",
+          color: hex.color,
         }}
+        aria-hidden="true"
       >
         {meta.label}
       </div>
@@ -174,11 +186,11 @@ export function TriageScoreCard({ result }: TriageScoreCardProps) {
         <ScoreRing
           score={result.risk_score}
           max={10}
-          color={meta.color}
-          strokeColor={meta.stroke}
+          hexColor={hex.color}
+          hexStroke={hex.stroke}
           size={120}
-          label="risk"
           sublabel="AI Risk Score"
+          ringId="risk"
         />
 
         <div className="divider w-full" />
@@ -186,43 +198,47 @@ export function TriageScoreCard({ result }: TriageScoreCardProps) {
         <ScoreRing
           score={result.news2_score}
           max={20}
-          color={meta.color}
-          strokeColor={`${meta.stroke}99`}
+          hexColor={hex.color}
+          hexStroke={hex.strokeDim}
           size={90}
-          label="news2"
           sublabel="NEWS2 Score"
+          ringId="news2"
         />
       </div>
 
-      {/* Threshold guide */}
+      {/* Threshold guide — data table accessible alternative (SKILL.md: data-table) */}
       <div
-        className="w-full rounded-lg p-3 text-[10px]"
+        className="w-full rounded-lg p-3 text-xs"
         style={{
-          background: "rgba(15, 23, 42, 0.6)",
-          border: "1px solid rgba(51, 65, 85, 0.4)",
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border-subtle)",
         }}
       >
         <p
-          className="font-semibold mb-2 text-[9px] uppercase tracking-widest"
+          className="mb-2 text-[11px] font-semibold uppercase tracking-widest"
           style={{ color: "var(--text-muted)" }}
         >
           NEWS2 Thresholds
         </p>
-        {[
-          { range: "0–4", label: "Routine", color: "#22c55e" },
-          { range: "5–6", label: "Urgent", color: "#f59e0b" },
-          { range: "7+", label: "Critical", color: "#ef4444" },
-        ].map(({ range, label, color }) => (
-          <div
-            key={label}
-            className="flex items-center justify-between py-0.5"
-          >
-            <span className="font-mono" style={{ color }}>
-              {range}
-            </span>
-            <span style={{ color: "var(--text-tertiary)" }}>{label}</span>
-          </div>
-        ))}
+        <table className="w-full" aria-label="NEWS2 score thresholds">
+          <tbody>
+            {[
+              { range: "0–4", label: "Routine", color: "#22c55e" },
+              { range: "5–6", label: "Urgent",  color: "#f59e0b" },
+              { range: "7+",  label: "Critical", color: "#ef4444" },
+            ].map(({ range, label, color }) => (
+              <tr key={label}>
+                <td
+                  className="font-mono tabular-nums py-0.5 pr-3"
+                  style={{ color }}
+                >
+                  {range}
+                </td>
+                <td style={{ color: "var(--text-tertiary)" }}>{label}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

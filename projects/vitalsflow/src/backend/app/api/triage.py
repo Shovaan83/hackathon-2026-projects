@@ -8,6 +8,7 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.triage import TriageOutput, VitalsInput
+from app.services.fhir_client import create_service_request, list_recent_service_requests
 from app.services.triage_service import run_triage
 
 router = APIRouter()
@@ -37,10 +38,10 @@ async def triage(patient_id: str, vitals: VitalsInput) -> TriageOutput:
 @router.post("/{patient_id}/approve")
 async def approve_action(patient_id: str, payload: dict) -> dict:
     """
-    Draft a FHIR ServiceRequest for a clinician-approved action.
+    Create a FHIR ServiceRequest for a clinician-approved action.
 
-    The hackathon version returns the drafted resource and logs it server-side.
-    Production would POST the draft back to the EHR/FHIR server.
+    The endpoint drafts a resource from approved action context,
+    then POSTs it to the configured FHIR server.
     """
     try:
         print(f"[VitalsFlow] POST /triage/{patient_id}/approve received")
@@ -54,10 +55,10 @@ async def approve_action(patient_id: str, payload: dict) -> dict:
         news2_score = int(payload.get("news2_score", 0))
         triage_tier = str(payload.get("triage_tier", "unknown")).strip().lower()
         priority = _priority_for_tier(triage_tier)
+        draft_id = uuid4().hex
 
         service_request = {
             "resourceType": "ServiceRequest",
-            "id": uuid4().hex,
             "status": "draft",
             "intent": "proposal",
             "priority": priority,
@@ -77,17 +78,59 @@ async def approve_action(patient_id: str, payload: dict) -> dict:
             ],
         }
 
-        print(f"Drafted ServiceRequest for patient={patient_id} action={action}")
+        created = await create_service_request(service_request)
+        created_id = str(created.get("id", "")).strip() or draft_id
+        service_request["id"] = created_id
+        print(f"Created ServiceRequest for patient={patient_id} action={action}")
+
         return {
-            "message": "ServiceRequest drafted",
+            "message": "ServiceRequest created",
             "patient_id": patient_id,
             "service_request": service_request,
+            "fhir_service_request_id": created_id,
+            "created_fhir_resource": created,
         }
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"ServiceRequest draft failed: {exc}",
+            detail=f"ServiceRequest create failed: {exc}",
         ) from exc
+
+
+@router.get("/approvals")
+async def approvals(count: int = 20) -> dict:
+    """
+    Return recent ServiceRequest drafts/proposals as approval queue data.
+    """
+    resources = await list_recent_service_requests(count=max(1, min(count, 50)))
+    items: list[dict] = []
+    for resource in resources:
+        if resource.get("resourceType") != "ServiceRequest":
+            continue
+
+        status = str(resource.get("status", "")).lower()
+        intent = str(resource.get("intent", "")).lower()
+        if status != "draft" and intent != "proposal":
+            continue
+
+        subject_ref = resource.get("subject", {}).get("reference", "")
+        patient_id = subject_ref.split("/")[-1] if "/" in subject_ref else subject_ref
+        notes = resource.get("note", [])
+        note_text = notes[0].get("text", "") if notes else ""
+        items.append(
+            {
+                "id": resource.get("id", ""),
+                "patient_id": patient_id,
+                "headline": resource.get("code", {}).get("text", "Draft action"),
+                "status": status or "draft",
+                "intent": intent or "proposal",
+                "priority": resource.get("priority", "routine"),
+                "authored_on": resource.get("authoredOn", ""),
+                "note": note_text,
+            }
+        )
+
+    return {"items": items, "count": len(items)}
 
 
 def _priority_for_tier(tier: str) -> str:
